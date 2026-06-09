@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analog Communication Toolbox - Virtual Lab</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Style Link -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Controls -->
+        <aside class="sidebar control-sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <div class="logo-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+                    <div class="header-titles">
+                        <h1>Comm Lab</h1>
+                        <p>Virtual Toolbox</p>
+                    </div>
+                </div>
+                <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Mode">
+                    <i class="sun-icon fa-solid fa-sun"></i>
+                    <i class="moon-icon fa-solid fa-moon"></i>
+                </button>
+            </div>
+
+            <!-- Global Simulation Controls -->
+            <div class="control-section">
+                <h3 class="control-section-title"><i class="fa-solid fa-play-pause"></i> Simulation</h3>
+                <div class="sim-controls-grid">
+                    <button id="btn-start" class="btn btn-primary"><i class="fa-solid fa-play"></i> Run</button>
+                    <button id="btn-pause" class="btn btn-outline" disabled><i class="fa-solid fa-pause"></i> Pause</button>
+                    <button id="btn-reset" class="btn btn-danger"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+                </div>
+            </div>
+
+            <!-- TAB 1: NOISE SIDEBAR CONTROLS -->
+            <div id="noise-sidebar" class="sidebar-tab-pane active">
+                <!-- Signal Generator Controls -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-sliders"></i> Signal Generator</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="signal-type">Waveform Shape</label>
+                        <select id="signal-type" class="select-input">
+                            <option value="sine">Sine Wave</option>
+                            <option value="square">Square Wave</option>
+                            <option value="triangle">Triangle Wave</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-amplitude">Amplitude (A)</label>
+                            <span id="val-amplitude" class="form-value">2.0 V</span>
+                        </div>
+                        <input type="range" id="param-amplitude" class="slider-input" min="0.1" max="5.0" step="0.1" value="2.0">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-frequency">Frequency (f)</label>
+                            <span id="val-frequency" class="form-value">50 Hz</span>
+                        </div>
+                        <input type="range" id="param-frequency" class="slider-input" min="5" max="250" step="5" value="50">
+                    </div>
+                </div>
+
+                <!-- Noise Channel Controls -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-bolt"></i> Noise Channel</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="noise-type">Noise Type</label>
+                        <select id="noise-type" class="select-input">
+                            <option value="awgn">AWGN (Gaussian)</option>
+                            <option value="thermal">Thermal Noise</option>
+                            <option value="impulse">Impulse Noise</option>
+                            <option value="uniform">Uniform Noise</option>
+                        </select>
+                    </div>
+
+                    <!-- SNR Lock Mode Checkbox -->
+                    <div class="form-group">
+                        <label class="checkbox-container" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+                            <input type="checkbox" id="snr-lock" style="cursor: pointer;">
+                            Lock Target SNR
+                        </label>
+                    </div>
+
+                    <!-- SNR Slider -->
+                    <div id="snr-slider-group" class="form-group" style="display: none;">
+                        <div class="form-label">
+                            <label for="param-snr">Target SNR</label>
+                            <span id="val-snr" class="form-value">10.0 dB</span>
+                        </div>
+                        <input type="range" id="param-snr" class="slider-input" min="-10" max="30" step="0.5" value="10">
+                    </div>
+
+                    <!-- Noise Intensity/Variance -->
+                    <div id="variance-slider-group" class="form-group">
+                        <div class="form-label">
+                            <label id="lbl-variance" for="param-variance">Noise Variance (σ²)</label>
+                            <span id="val-variance" class="form-value">0.50 V²</span>
+                        </div>
+                        <input type="range" id="param-variance" class="slider-input" min="0.01" max="4.00" step="0.01" value="0.5">
+                    </div>
+
+                    <!-- Thermal Specific Controls -->
+                    <div id="thermal-group" style="display: none; gap: 1rem; flex-direction: column;">
+                        <div class="form-group">
+                            <div class="form-label">
+                                <label for="param-temp">Temperature (T)</label>
+                                <span id="val-temp" class="form-value">290 K</span>
+                            </div>
+                            <input type="range" id="param-temp" class="slider-input" min="10" max="1000" step="10" value="290">
+                        </div>
+                        <div class="form-group">
+                            <div class="form-label">
+                                <label for="param-bandwidth">Noise Bandwidth (B)</label>
+                                <span id="val-bandwidth" class="form-value">1.0 MHz</span>
+                            </div>
+                            <input type="range" id="param-bandwidth" class="slider-input" min="0.1" max="10.0" step="0.1" value="1.0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receiver Filter Controls -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-filter"></i> Receiver Filter</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="filter-type">Filter Type</label>
+                        <select id="filter-type" class="select-input">
+                            <option value="none">No Filter (Pass-through)</option>
+                            <option value="lpf">Butterworth Low-Pass</option>
+                            <option value="hpf">Butterworth High-Pass</option>
+                            <option value="bpf">Butterworth Band-Pass</option>
+                            <option value="moving">Moving Average</option>
+                        </select>
+                    </div>
+
+                    <!-- Cutoff Slider -->
+                    <div id="cutoff-slider-group" class="form-group" style="display: none;">
+                        <div class="form-label">
+                            <label id="lbl-cutoff" for="param-cutoff">Cutoff Frequency (fc)</label>
+                            <span id="val-cutoff" class="form-value">80 Hz</span>
+                        </div>
+                        <input type="range" id="param-cutoff" class="slider-input" min="5" max="500" step="5" value="80">
+                    </div>
+
+                    <!-- Bandpass Cutoff 2 -->
+                    <div id="cutoff2-slider-group" class="form-group" style="display: none;">
+                        <div class="form-label">
+                            <label for="param-cutoff2">Upper Cutoff (fc2)</label>
+                            <span id="val-cutoff2" class="form-value">120 Hz</span>
+                        </div>
+                        <input type="range" id="param-cutoff2" class="slider-input" min="10" max="800" step="5" value="120">
+                    </div>
+
+                    <!-- Window Size -->
+                    <div id="m-window-slider-group" class="form-group" style="display: none;">
+                        <div class="form-label">
+                            <label for="param-m-window">Window Samples (M)</label>
+                            <span id="val-m-window" class="form-value">5</span>
+                        </div>
+                        <input type="range" id="param-m-window" class="slider-input" min="2" max="25" step="1" value="5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: AM MODULATION SIDEBAR CONTROLS -->
+            <div id="am-sidebar" class="sidebar-tab-pane" style="display: none;">
+                <!-- Modulating Message Signal -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-sliders"></i> Message Signal m(t)</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="am-msg-shape">Waveform Shape</label>
+                        <select id="am-msg-shape" class="select-input">
+                            <option value="sine">Sine Wave</option>
+                            <option value="square">Square Wave</option>
+                            <option value="triangle">Triangle Wave</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-am-am">Amplitude (Am)</label>
+                            <span id="val-am-am" class="form-value">2.0 V</span>
+                        </div>
+                        <input type="range" id="param-am-am" class="slider-input" min="0.1" max="5.0" step="0.1" value="2.0">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-am-fm">Frequency (fm)</label>
+                            <span id="val-am-fm" class="form-value">30 Hz</span>
+                        </div>
+                        <input type="range" id="param-am-fm" class="slider-input" min="10" max="100" step="5" value="30">
+                    </div>
+                </div>
+
+                <!-- Carrier Signal -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-bezier-curve"></i> Carrier Signal c(t)</h3>
+                    
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-am-ac">Amplitude (Ac)</label>
+                            <span id="val-am-ac" class="form-value">3.0 V</span>
+                        </div>
+                        <input type="range" id="param-am-ac" class="slider-input" min="1.0" max="5.0" step="0.1" value="3.0">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-am-fc">Frequency (fc)</label>
+                            <span id="val-am-fc" class="form-value">300 Hz</span>
+                        </div>
+                        <input type="range" id="param-am-fc" class="slider-input" min="150" max="800" step="10" value="300">
+                    </div>
+                </div>
+
+                <!-- Modulation Type & Index -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-wave-square"></i> AM Settings</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="am-type">Modulation Scheme</label>
+                        <select id="am-type" class="select-input">
+                            <option value="dsb-fc">Standard AM (DSB-FC)</option>
+                            <option value="dsb-sc">Double Sideband (DSB-SC)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="mu-slider-group">
+                        <div class="form-label">
+                            <label for="param-am-mu">Modulation Index (μ)</label>
+                            <span id="val-am-mu" class="form-value">0.67</span>
+                        </div>
+                        <input type="range" id="param-am-mu" class="slider-input" min="0.0" max="2.0" step="0.05" value="0.67">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label for="param-am-tscale">Time Window</label>
+                            <span id="val-am-tscale" class="form-value">15 ms</span>
+                        </div>
+                        <input type="range" id="param-am-tscale" class="slider-input" min="5" max="50" step="1" value="15">
+                    </div>
+                </div>
+
+                <!-- Channel Noise & Demodulator -->
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-shield-halved"></i> Channel & Demod</h3>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-container" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+                            <input type="checkbox" id="am-noise-toggle" style="cursor: pointer;">
+                            Enable Channel Noise
+                        </label>
+                    </div>
+
+                    <div class="form-group" id="am-noise-intensity-group" style="display: none;">
+                        <div class="form-label">
+                            <label for="param-am-noise">Noise Power (σ²)</label>
+                            <span id="val-am-noise" class="form-value">0.10 V²</span>
+                        </div>
+                        <input type="range" id="param-am-noise" class="slider-input" min="0.01" max="2.0" step="0.05" value="0.10">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="am-demod-type">Demodulator Type</label>
+                        <select id="am-demod-type" class="select-input">
+                            <option value="envelope">Envelope Detector</option>
+                            <option value="coherent">Coherent Detector</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-label">
+                            <label id="lbl-am-demod-cutoff" for="param-am-demod-cutoff">Detector LPF Cutoff</label>
+                            <span id="val-am-demod-cutoff" class="form-value">80 Hz</span>
+                        </div>
+                        <input type="range" id="param-am-demod-cutoff" class="slider-input" min="10" max="250" step="5" value="80">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: FM MODULATION SIDEBAR CONTROLS -->
+            <div id="fm-sidebar" class="sidebar-tab-pane" style="display: none;">
+                <div class="control-section">
+                    <h3 class="control-section-title"><i class="fa-solid fa-circle-info"></i> FM Lab Status</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+                        Select options in the main panel to review pre-calculated setups. Full interactive controls will be unlocked in the next software iteration.
+                    </p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Display Panel -->
+        <main class="main-panel">
+            <!-- Global Lab Toolbar -->
+            <header class="main-header" style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center;">
+                <div class="title-section">
+                    <h2>Analog Communication Virtual Lab</h2>
+                    <p class="subtitle" style="font-size: 0.75rem; color: var(--text-muted);">Interactive Simulation Toolbox for Engineering Students</p>
+                </div>
+                <div class="header-actions" style="display: flex; gap: 0.75rem;">
+                    <button id="btn-export-csv" class="btn btn-outline" title="Download current timeseries data as CSV">
+                        <i class="fa-solid fa-file-csv"></i> Export CSV
+                    </button>
+                    <button id="btn-export-img" class="btn btn-outline" title="Export graph as image">
+                        <i class="fa-solid fa-image"></i> Export Graph
+                    </button>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <div class="tabs-header">
+                <button class="tab-btn active" data-tab="noise-tab"><i class="fa-solid fa-bolt"></i> Noise & Filtering</button>
+                <button class="tab-btn" data-tab="am-tab"><i class="fa-solid fa-wave-square"></i> AM Modulation</button>
+                <button class="tab-btn" data-tab="fm-tab"><i class="fa-solid fa-radio"></i> FM Modulation</button>
+            </div>
+
+            <!-- TAB 1: NOISE LAB VIEW -->
+            <div id="noise-tab" class="tab-content active">
+                <!-- Animated Signal Flow Diagram -->
+                <section class="signal-flow-card card">
+                    <h3 class="card-title"><i class="fa-solid fa-network-wired"></i> Communication Link Signal Path</h3>
+                    <div class="flow-container">
+                        <div class="flow-block block-tx" id="flow-tx">
+                            <i class="fa-solid fa-tower-broadcast"></i>
+                            <span class="block-label">Transmitter (Tx)</span>
+                            <span class="block-detail" id="tx-detail">Sine, 50 Hz</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow" id="arrow-tx-channel"></div>
+                            <span class="signal-tag sig-clean">Clean Signal</span>
+                        </div>
+                        <div class="flow-block block-channel" id="flow-channel">
+                            <i class="fa-solid fa-cloud-bolt"></i>
+                            <span class="block-label">Noisy Channel</span>
+                            <span class="block-detail" id="channel-detail">AWGN Noise</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow" id="arrow-channel-rx"></div>
+                            <span class="signal-tag sig-noisy">Noisy Signal</span>
+                        </div>
+                        <div class="flow-block block-rx" id="flow-rx">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span class="block-label">Receiver (Rx)</span>
+                            <span class="block-detail" id="rx-detail">LPF (80 Hz)</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow" id="arrow-rx-output"></div>
+                            <span class="signal-tag sig-recovered">Recovered</span>
+                        </div>
+                        <div class="flow-block block-output" id="flow-output">
+                            <i class="fa-solid fa-headphones"></i>
+                            <span class="block-label">Demodulated Output</span>
+                            <span class="block-detail" id="output-detail">Active</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Metrics Grid -->
+                <section class="metrics-grid">
+                    <div class="metric-card card">
+                        <span class="metric-label">Signal Power (Ps)</span>
+                        <span class="metric-value" id="metric-sig-power">2.000 V²</span>
+                        <span class="metric-desc">Power of the pure clean wave</span>
+                    </div>
+                    <div class="metric-card card">
+                        <span class="metric-label">Noise Power (Pn)</span>
+                        <span class="metric-value" id="metric-noise-power">0.500 V²</span>
+                        <span class="metric-desc">Average power of channel noise</span>
+                    </div>
+                    <div class="metric-card card primary">
+                        <span class="metric-label">Signal-to-Noise Ratio (SNR)</span>
+                        <span class="metric-value" id="metric-snr">6.02 dB</span>
+                        <span class="metric-desc">Power ratio in Decibels (dB)</span>
+                    </div>
+                    <div class="metric-card card warning">
+                        <span class="metric-label">Mean Squared Error (MSE)</span>
+                        <span class="metric-value" id="metric-mse">0.250 V²</span>
+                        <span class="metric-desc">Clean vs. Recovered error variance</span>
+                    </div>
+                    <div class="metric-card card success">
+                        <span class="metric-label">Peak SNR (PSNR)</span>
+                        <span class="metric-value" id="metric-psnr">12.04 dB</span>
+                        <span class="metric-desc">Logarithmic peak signal quality</span>
+                    </div>
+                </section>
+
+                <!-- Waveform View Area -->
+                <section class="charts-section" id="charts-wrapper" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- Time Domain Waveform Chart -->
+                    <div class="chart-card card" id="time-domain-card" style="flex-grow: 1;">
+                        <div class="chart-header">
+                            <h3 class="card-title"><i class="fa-solid fa-chart-line"></i> Time-Domain Waveforms</h3>
+                            <div class="chart-legend-toggles" style="display: flex; gap: 0.75rem;">
+                                <label class="legend-toggle"><input type="checkbox" id="toggle-sig-original" checked><span class="indicator orig" style="background-color: var(--color-original);"></span>Original</label>
+                                <label class="legend-toggle"><input type="checkbox" id="toggle-sig-noise" checked><span class="indicator noise" style="background-color: var(--color-noise);"></span>Noise</label>
+                                <label class="legend-toggle"><input type="checkbox" id="toggle-sig-noisy" checked><span class="indicator noisy" style="background-color: var(--color-noisy);"></span>Noisy</label>
+                                <label class="legend-toggle"><input type="checkbox" id="toggle-sig-recovered" checked><span class="indicator rec" style="background-color: var(--color-recovered);"></span>Recovered</label>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                            <canvas id="chart-time"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Frequency Spectrum Chart -->
+                    <div class="chart-card card" id="frequency-domain-card">
+                        <div class="chart-header">
+                            <h3 class="card-title"><i class="fa-solid fa-chart-area"></i> Frequency-Domain Spectrum (FFT)</h3>
+                            <div class="spectrum-controls"><span class="sampling-rate-badge badge-fft" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: var(--radius-full);">fs: 2000 Hz</span></div>
+                        </div>
+                        <div class="chart-container" style="position: relative; height: 260px; width: 100%;">
+                            <canvas id="chart-frequency"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Grid Layout for Split Comparison (Hidden by default) -->
+                <section class="split-charts-section card" id="split-wrapper" style="display: none; padding: 1.5rem; margin-top: 1rem;">
+                    <div class="chart-header" style="margin-bottom: 1rem;">
+                        <h3 class="card-title"><i class="fa-solid fa-sliders"></i> Side-by-Side Comparison</h3>
+                    </div>
+                    <div class="split-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                        <div class="split-chart-box">
+                            <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--color-original);">Original Transmitted Signal</h4>
+                            <div class="split-canvas-container" style="height: 180px;"><canvas id="chart-split-original"></canvas></div>
+                        </div>
+                        <div class="split-chart-box">
+                            <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--color-noise);">Channel Noise Profile</h4>
+                            <div class="split-canvas-container" style="height: 180px;"><canvas id="chart-split-noise"></canvas></div>
+                        </div>
+                        <div class="split-chart-box">
+                            <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--color-noisy);">Noisy Received Signal</h4>
+                            <div class="split-canvas-container" style="height: 180px;"><canvas id="chart-split-noisy"></canvas></div>
+                        </div>
+                        <div class="split-chart-box">
+                            <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--color-recovered);">Filtered Recovered Signal</h4>
+                            <div class="split-canvas-container" style="height: 180px;"><canvas id="chart-split-recovered"></canvas></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Educational section -->
+                <section class="education-section card" style="margin-top: 1.5rem; padding: 1.5rem; background-color: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-color);">
+                    <h3 class="card-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-graduation-cap"></i> Academic Reference & Lab Experiments</h3>
+                    <div class="edu-accordion">
+                        <div class="edu-item">
+                            <button class="edu-header" style="width: 100%; text-align: left; padding: 0.75rem 0; background: none; border: none; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fa-solid fa-book-open"></i> Mathematical Formulations of Noise Types</span>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+                            <div class="edu-content" style="padding: 1rem 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                                <p><strong>AWGN:</strong> Normal Gaussian distribution with zero mean. White spectrum, additive nature: $$p(x) = \frac{1}{\sqrt{2\pi\sigma^2}} e^{-\frac{x^2}{2\sigma^2}}$$</p>
+                                <p><strong>Thermal Noise:</strong> Johnson-Nyquist formula: $$\sigma_n^2 = 4 k_B T B R$$</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- TAB 2: AM MODULATION LAB VIEW -->
+            <div id="am-tab" class="tab-content" style="display: none;">
+                <!-- AM Block Diagram -->
+                <section class="signal-flow-card card">
+                    <h3 class="card-title"><i class="fa-solid fa-network-wired"></i> AM Transmitter-Receiver Block Diagram</h3>
+                    <div class="flow-container">
+                        <div class="flow-block block-tx" id="flow-am-message" style="border-color: var(--color-original);">
+                            <i class="fa-solid fa-wave-square"></i>
+                            <span class="block-label">Message Signal m(t)</span>
+                            <span class="block-detail" id="am-tx-msg-detail">Sine, 30 Hz</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow active"></div>
+                            <span class="signal-tag sig-clean">Message</span>
+                        </div>
+                        <div class="flow-block block-channel" id="flow-am-modulator" style="border-color: var(--primary);">
+                            <i class="fa-solid fa-arrows-spin"></i>
+                            <span class="block-label">AM Modulator</span>
+                            <span class="block-detail" id="am-mod-detail">DSB-FC (μ = 0.67)</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow active"></div>
+                            <span class="signal-tag sig-noisy">Modulated Wave</span>
+                        </div>
+                        <div class="flow-block block-channel" id="flow-am-channel" style="border-color: var(--color-noise);">
+                            <i class="fa-solid fa-wifi"></i>
+                            <span class="block-label">Noisy Channel</span>
+                            <span class="block-detail" id="am-channel-detail">Clean Link</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow active"></div>
+                            <span class="signal-tag sig-noisy">Received Signal</span>
+                        </div>
+                        <div class="flow-block block-rx" id="flow-am-demod" style="border-color: var(--color-recovered);">
+                            <i class="fa-solid fa-filter"></i>
+                            <span class="block-label">Demodulator</span>
+                            <span class="block-detail" id="am-rx-detail">Envelope (80 Hz)</span>
+                        </div>
+                        <div class="flow-arrow-container">
+                            <div class="flow-arrow active"></div>
+                            <span class="signal-tag sig-recovered">Recovered</span>
+                        </div>
+                        <div class="flow-block block-output" id="flow-am-output">
+                            <i class="fa-solid fa-headphones"></i>
+                            <span class="block-label">Recovered Signal</span>
+                            <span class="block-detail" id="am-out-detail">Clean</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AM Metrics Grid -->
+                <section class="metrics-grid">
+                    <div class="metric-card card" id="am-mu-card">
+                        <span class="metric-label">Modulation Index (μ) <span id="am-modulation-status-badge" class="chart-badge badge-original">Under</span></span>
+                        <span class="metric-value" id="am-metric-mu">0.67</span>
+                        <span class="metric-desc">Percentage: <span id="am-metric-pct">67%</span></span>
+                    </div>
+                    <div class="metric-card card">
+                        <span class="metric-label">Carrier Power (Pc)</span>
+                        <span class="metric-value" id="am-metric-pc">4.50 V²</span>
+                        <span class="metric-desc">Power allocated to the carrier wave</span>
+                    </div>
+                    <div class="metric-card card">
+                        <span class="metric-label">Sideband Power (Psb)</span>
+                        <span class="metric-value" id="am-metric-psb">1.01 V²</span>
+                        <span class="metric-desc">Power of upper and lower sidebands</span>
+                    </div>
+                    <div class="metric-card card warning" id="am-warning-card">
+                        <span class="metric-label">Mean Squared Error (MSE)</span>
+                        <span class="metric-value" id="am-metric-mse">0.012 V²</span>
+                        <span class="metric-desc">Message vs. Demodulated mismatch</span>
+                    </div>
+                    <div class="metric-card card success">
+                        <span class="metric-label">Channel SNR</span>
+                        <span class="metric-value" id="am-metric-snr">∞ dB</span>
+                        <span class="metric-desc">Signal-to-Noise Ratio in channel</span>
+                    </div>
+                </section>
+
+                <!-- Warning Indicator Banner (Shows only when overmodulation happens) -->
+                <div id="am-overmod-warning-banner" class="card" style="display: none; background: rgba(239, 68, 68, 0.15); border: 2px solid var(--danger); color: var(--danger); padding: 1rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem; font-weight: 600;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.95rem;">WARNING: OVERMODULATION ENCOUNTERED (μ &gt; 1.0)</h4>
+                        <p style="margin: 0; font-size: 0.8rem; font-weight: 400; color: var(--text-primary); opacity: 0.85;">
+                            Envelope distortion is occurring. An envelope detector will fail to demodulate this wave cleanly. Phase reversal occurs.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- AM Charts Panels -->
+                <section class="charts-grid" style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem;">
+                    <!-- Time Domain Oscilloscope -->
+                    <div class="chart-card card original-card">
+                        <div class="chart-header">
+                            <h3 class="card-title"><i class="fa-solid fa-wave-square"></i> Time-Domain Oscilloscope View</h3>
+                            <div class="chart-legend-toggles" style="display: flex; gap: 0.6rem; font-size: 0.75rem;">
+                                <label class="legend-toggle"><input type="checkbox" id="am-toggle-msg" checked><span class="indicator orig" style="background-color: var(--color-original);"></span>Message</label>
+                                <label class="legend-toggle"><input type="checkbox" id="am-toggle-mod" checked><span class="indicator noisy" style="background-color: var(--color-noisy);"></span>AM Signal</label>
+                                <label class="legend-toggle"><input type="checkbox" id="am-toggle-env" checked><span class="indicator noise" style="border: 1px dashed var(--color-noise); background: none;"></span>Envelope</label>
+                                <label class="legend-toggle"><input type="checkbox" id="am-toggle-demod" checked><span class="indicator rec" style="background-color: var(--color-recovered);"></span>Recovered</label>
+                            </div>
+                        </div>
+                        <div class="chart-canvas-container" style="height: 380px;">
+                            <canvas id="chart-am-time"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right hand side split widgets: FFT and Trapezoid -->
+                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <!-- Spectrum Analyzer -->
+                        <div class="chart-card card fft-card" style="flex: 1;">
+                            <div class="chart-header">
+                                <h3 class="card-title"><i class="fa-solid fa-chart-area"></i> AM Spectrum Analyzer</h3>
+                            </div>
+                            <div class="chart-canvas-container" style="height: 180px;">
+                                <canvas id="chart-am-frequency"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Trapezoidal XY Plot -->
+                        <div class="chart-card card recovered-card" style="flex: 1;">
+                            <div class="chart-header">
+                                <h3 class="card-title"><i class="fa-solid fa-chart-line"></i> Trapezoidal XY Loop Display</h3>
+                                <span class="chart-badge badge-fft" style="font-size: 0.65rem;">s(t) vs m(t)</span>
+                            </div>
+                            <div class="chart-canvas-container" style="height: 180px;">
+                                <canvas id="chart-am-trapezoid"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Learning Panel -->
+                <section class="education-section card" style="padding: 1.5rem; background-color: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-color);">
+                    <h3 class="card-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-graduation-cap"></i> Amplitude Modulation (AM) Reference Panel</h3>
+                    <div class="edu-accordion">
+                        <div class="edu-item">
+                            <button class="edu-header am-edu-header" style="width: 100%; text-align: left; padding: 0.75rem 0; background: none; border: none; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fa-solid fa-circle-info"></i> Definition & Core Mathematics of Amplitude Modulation</span>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+                            <div class="edu-content" style="padding: 1rem 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                                <p>
+                                    <strong>Amplitude Modulation (AM)</strong> is a process in which the amplitude of a high-frequency carrier wave is varied in accordance with the instantaneous amplitude of a low-frequency message signal.
+                                </p>
+                                <p style="margin-top: 0.75rem;">
+                                    The mathematical expression for a standard full carrier AM wave (DSB-FC) is given by:
+                                    $$s(t) = A_c [1 + \mu \cos(2\pi f_m t)] \cos(2\pi f_c t)$$
+                                    Where:
+                                    <ul>
+                                        <li>$A_c$ is the carrier amplitude.</li>
+                                        <li>$f_c$ is the carrier frequency.</li>
+                                        <li>$f_m$ is the modulating signal (message) frequency.</li>
+                                        <li>$\mu = A_m / A_c$ is the **Modulation Index** (also denoted as $m$).</li>
+                                    </ul>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="edu-item">
+                            <button class="edu-header am-edu-header" style="width: 100%; text-align: left; padding: 0.75rem 0; background: none; border: none; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fa-solid fa-circle-check"></i> Advantages & Disadvantages of AM</span>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+                            <div class="edu-content" style="padding: 1rem 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                                <p><strong>Advantages:</strong></p>
+                                <ul style="margin-left: 1.5rem; margin-bottom: 0.75rem;">
+                                    <li>Extremely simple transmitter and receiver structures (envelope detector is highly cost-efficient).</li>
+                                    <li>Narrow signal bandwidth ($2f_m$).</li>
+                                    <li>Easy sky-wave / ionospheric propagation, allowing simple receivers to pick up broadcasts over vast geographical areas.</li>
+                                </ul>
+                                <p><strong>Disadvantages:</strong></p>
+                                <ul style="margin-left: 1.5rem;">
+                                    <li>Highly wasteful of power: The carrier contains no message information but carries at least 66.6% of the total transmitted power at $\mu=1$.</li>
+                                    <li>Extremely susceptible to electromagnetic noise, environmental noise, and lightning clicks which impact the wave amplitude directly.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="edu-item">
+                            <button class="edu-header am-edu-header" style="width: 100%; text-align: left; padding: 0.75rem 0; background: none; border: none; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fa-solid fa-tower-cell"></i> Applications of AM in Communication Systems</span>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+                            <div class="edu-content" style="padding: 1rem 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                                <ul>
+                                    <li><strong>AM Radio Broadcasting:</strong> In Medium Wave (MW) and Short Wave (SW) bands, facilitating intercontinental signal transmissions.</li>
+                                    <li><strong>Air Traffic Control & Aircraft Communication:</strong> Aviation VHF communications (118–137 MHz) utilize AM instead of FM because of the *capture effect* in FM (which suppresses weaker signals). In AM, if two signals overlap, they mix, allowing controllers to detect simultaneous transmissions during emergency scenarios.</li>
+                                    <li><strong>Single Sideband (SSB):</strong> A power-saving variant of AM used extensively in amateur radio, marine communications, and military links.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="edu-item">
+                            <button class="edu-header am-edu-header" style="width: 100%; text-align: left; padding: 0.75rem 0; background: none; border: none; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fa-solid fa-flask"></i> Guided AM Lab Experiments</span>
+                                <i class="fa-solid fa-chevron-down chevron"></i>
+                            </button>
+                            <div class="edu-content" style="padding: 1rem 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                                <ol style="margin-left: 1.5rem;">
+                                    <li><strong>Analyzing Envelope Distortion:</strong> Set Modulation Index to $\mu = 0.50$ (Under-modulation). Observe that the envelope follows the message. Change $\mu$ to $1.20$. Observe the phase reversal and notice how the diode detector chops the signal, introducing harmonic distortion.</li>
+                                    <li><strong>Verify Sideband Spectral Layout:</strong> Set $f_c = 300\text{ Hz}$ and $f_m = 30\text{ Hz}$. Look at the Spectrum Analyzer. Observe the three distinct spikes: the center carrier spike at $300\text{ Hz}$, the lower sideband (LSB) at $270\text{ Hz}$, and the upper sideband (USB) at $330\text{ Hz}$.</li>
+                                    <li><strong>RC Time Constant Clipping:</strong> Set the demodulator to **Envelope Detector**. Slide the Detector Cutoff slider to a very low frequency ($10\text{ Hz}$). Observe that the recovered wave cannot discharge fast enough, causing diagonal clipping. Slide it to $250\text{ Hz}$ and observe the high-frequency ripples of the carrier bleeding into the output.</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- TAB 3: FM MODULATION LAB VIEW -->
+            <div id="fm-tab" class="tab-content" style="display: none;">
+                <div class="card" style="padding: 3rem; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;">
+                    <i class="fa-solid fa-radio" style="font-size: 4rem; color: var(--primary); opacity: 0.8;"></i>
+                    <h2 style="font-size: 1.8rem; font-weight: 700;">Frequency Modulation (FM) demonstrator</h2>
+                    <p style="max-width: 600px; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+                        Frequency Modulation (FM) varies the instantaneous frequency of the carrier signal in proportion to the message signal amplitude:
+                        $$s_{FM}(t) = A_c \cos\left(2\pi f_c t + \beta \sin(2\pi f_m t)\right)$$
+                        where $\beta$ is the modulation index. Unlike AM, FM offers superior noise rejection (constant amplitude envelope makes it immune to amplitude spikes) but requires much wider bandwidth defined by **Carson's Rule**: $B_{FM} = 2(\Delta f + f_m)$.
+                    </p>
+                    <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem 2rem; color: var(--accent); font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                        <i class="fa-solid fa-lock"></i> Locked for Next Lab Session (Interactive controls in progress)
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MathJax for nice LaTeX math rendering -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="js/dsp.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
