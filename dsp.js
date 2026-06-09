@@ -1,349 +1,423 @@
 /**
- * Noise Effect Demonstrator - DSP Engine
- * Handles signal generation, noise models, DSP filters, FFT analysis, and statistical calculations.
- * Designed for Analog Communication Engineering educational demonstrations.
+ * dsp.js - Digital Signal Processing Engine
+ * Handles signal generation, noise simulation, IIR filtering, and FFT analysis.
+ * Part of the "Noise Effect Demonstrator" web application.
  */
 
-// --- Complex Number Class for FFT ---
-class Complex {
-    constructor(re = 0, im = 0) {
-        this.re = re;
-        this.im = im;
-    }
+const DSP = {
+    // Generate original clean signals
+    generateSignal(type, frequency, amplitude, timeArray) {
+        const N = timeArray.length;
+        const signal = new Float32Array(N);
 
-    add(c) {
-        return new Complex(this.re + c.re, this.im + c.im);
-    }
-
-    sub(c) {
-        return new Complex(this.re - c.re, this.im - c.im);
-    }
-
-    mul(c) {
-        return new Complex(
-            this.re * c.re - this.im * c.im,
-            this.re * c.im + this.im * c.re
-        );
-    }
-
-    magnitude() {
-        return Math.sqrt(this.re * this.re + this.im * this.im);
-    }
-}
-
-// --- Signal Generation ---
-function generateSignal(type, amplitude, frequency, timeArray) {
-    const N = timeArray.length;
-    const signal = new Float32Array(N);
-
-    for (let i = 0; i < N; i++) {
-        const t = timeArray[i];
-        switch (type) {
-            case 'sine':
-                signal[i] = amplitude * Math.sin(2 * Math.PI * frequency * t);
-                break;
-            case 'square':
-                signal[i] = amplitude * Math.sign(Math.sin(2 * Math.PI * frequency * t));
-                break;
-            case 'triangle':
-                signal[i] = triangleWave(t, frequency, amplitude);
-                break;
-            default:
-                signal[i] = 0;
+        for (let i = 0; i < N; i++) {
+            const t = timeArray[i];
+            switch (type) {
+                case 'sine':
+                    signal[i] = amplitude * Math.sin(2 * Math.PI * frequency * t);
+                    break;
+                case 'square':
+                    signal[i] = amplitude * Math.sign(Math.sin(2 * Math.PI * frequency * t));
+                    break;
+                case 'triangle':
+                    // Triangle wave with period T = 1/f
+                    // Form: A * (2/pi) * arcsin(sin(2*pi*f*t))
+                    signal[i] = amplitude * (2 / Math.PI) * Math.asin(Math.sin(2 * Math.PI * frequency * t));
+                    break;
+                default:
+                    signal[i] = 0;
+            }
         }
-    }
-    return signal;
-}
+        return signal;
+    },
 
-function triangleWave(t, freq, amp) {
-    const period = 1 / freq;
-    const phase = (t % period) / period; // Normalized phase between 0 and 1
-    if (phase < 0.25) {
-        return amp * (phase / 0.25);
-    } else if (phase < 0.75) {
-        return amp * (2 - (phase / 0.25));
-    } else {
-        return amp * ((phase / 0.25) - 4);
-    }
-}
-
-// --- Noise Generators ---
-
-// Box-Muller transform for Gaussian Distribution
-function randomGaussian(mean = 0, stdDev = 1) {
-    let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
-    const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-    return num * stdDev + mean;
-}
-
-/**
- * Generate noise based on selected type and parameters
- * @param {string} type - 'awgn', 'thermal', 'impulse', 'uniform'
- * @param {number} size - Number of samples
- * @param {Float32Array} originalSignal - Used for target SNR scaling in AWGN
- * @param {object} params - Noise parameters (variance, intensity, SNR, temperature, bandwidth, impulseProbability)
- */
-function generateNoise(type, size, originalSignal, params) {
-    const noise = new Float32Array(size);
-    
-    // Calculate signal power (needed for SNR-based noise generation)
-    let signalPower = 0;
-    for (let i = 0; i < size; i++) {
-        signalPower += originalSignal[i] * originalSignal[i];
-    }
-    signalPower /= size;
-    if (signalPower === 0) signalPower = 0.0001; // Avoid division by zero
-
-    switch (type) {
-        case 'awgn':
-            if (params.useTargetSNR) {
-                // SNR (dB) = 10 * log10(Ps / Pn) -> Pn = Ps / 10^(SNR/10)
-                const snrLinear = Math.pow(10, params.targetSNR / 10);
-                const noisePower = signalPower / snrLinear;
-                const stdDev = Math.sqrt(noisePower);
-                for (let i = 0; i < size; i++) {
-                    noise[i] = randomGaussian(0, stdDev);
-                }
-            } else {
-                // Manual variance mode: standard deviation = sqrt(variance)
-                const stdDev = Math.sqrt(params.variance);
-                for (let i = 0; i < size; i++) {
-                    noise[i] = randomGaussian(0, stdDev);
+    // Noise Generators
+    noise: {
+        // Additive White Gaussian Noise using Box-Muller Transform
+        generateAWGN(length, variance) {
+            const noise = new Float32Array(length);
+            const stdDev = Math.sqrt(variance);
+            
+            for (let i = 0; i < length; i += 2) {
+                let u1 = Math.random();
+                let u2 = Math.random();
+                
+                // Avoid log(0)
+                while (u1 <= 1e-15) u1 = Math.random();
+                
+                const r = Math.sqrt(-2.0 * Math.log(u1));
+                const theta = 2.0 * Math.PI * u2;
+                
+                const z0 = r * Math.cos(theta) * stdDev;
+                const z1 = r * Math.sin(theta) * stdDev;
+                
+                noise[i] = z0;
+                if (i + 1 < length) {
+                    noise[i + 1] = z1;
                 }
             }
-            break;
+            return noise;
+        },
 
-        case 'thermal':
-            // Johnson-Nyquist noise approximation: P_n = 4 * k_B * T * B * R.
-            // We'll use a normalized model where T (Kelvin) and B (Bandwidth) scale the noise power.
-            // Scaling factor chosen to make sliders in user-friendly ranges (T: 0-500K, B: 1-100MHz).
-            const k_scaled = 1.38e-4; // Normalized constant
-            const thermalNoisePower = k_scaled * params.temperature * (params.bandwidth * 1e6) * 1e-6; 
-            const thermalStdDev = Math.sqrt(thermalNoisePower);
-            for (let i = 0; i < size; i++) {
-                noise[i] = randomGaussian(0, thermalStdDev);
-            }
-            break;
+        // Thermal Noise: Variance depends on Temperature (T) and Bandwidth (B)
+        // Physically: σ² = 4 * k_B * T * B * R.
+        // We'll scale this physical equation to reasonable simulator values:
+        // k_B = 1.38e-23, R = 50 Ohms, and scale up for visualization visibility.
+        generateThermal(length, temperature, bandwidth) {
+            const kB = 1.38e-23;
+            const R = 50.0; // Standard 50 ohm impedance
+            // Scaling factor to map thermal noise to range 0.0 to 2.0 V RMS for visibility
+            const scaleFactor = 1.0e17; 
+            const variance = 4.0 * kB * temperature * bandwidth * R * scaleFactor;
+            return this.generateAWGN(length, variance);
+        },
 
-        case 'impulse':
-            // Salt & Pepper or Bernoulli-Gaussian noise
-            // Probability represents the density of spikes. Height is controlled by noise intensity.
-            const spikeAmplitude = params.intensity * 2.5; // Scale height for visible impact
-            for (let i = 0; i < size; i++) {
-                if (Math.random() < params.impulseProbability) {
-                    noise[i] = (Math.random() > 0.5 ? 1 : -1) * spikeAmplitude;
+        // Impulse Noise (Salt & Pepper / Click noise)
+        // Spikes occurring with probability p (intensity), with random polarities and max amplitude
+        generateImpulse(length, intensity, maxAmplitude) {
+            const noise = new Float32Array(length);
+            for (let i = 0; i < length; i++) {
+                if (Math.random() < intensity) {
+                    // Random polarity (+1 or -1) times signal amplitude scale
+                    noise[i] = (Math.random() > 0.5 ? 1 : -1) * maxAmplitude * (0.8 + Math.random() * 0.4);
                 } else {
-                    noise[i] = 0;
+                    noise[i] = 0.0;
                 }
             }
-            break;
+            return noise;
+        },
 
-        case 'uniform':
-            // Uniformly distributed noise between [-W, W]
-            // Noise power for uniform distribution: W^2 / 3.
-            // We scale W directly by noise intensity.
-            const width = params.intensity;
-            for (let i = 0; i < size; i++) {
-                noise[i] = (Math.random() - 0.5) * 2 * width;
+        // Uniform Noise
+        // Distributed uniformly between -W and +W. Variance of uniform noise is W²/3.
+        // So given variance V, W = sqrt(3 * V).
+        generateUniform(length, variance) {
+            const noise = new Float32Array(length);
+            const w = Math.sqrt(3.0 * variance);
+            for (let i = 0; i < length; i++) {
+                noise[i] = (Math.random() * 2.0 - 1.0) * w;
             }
-            break;
+            return noise;
+        }
+    },
 
-        default:
-            // No noise
-            break;
-    }
-    return noise;
-}
-
-// --- Digital Filtering Algorithms ---
-
-function applyFilter(type, signal, params) {
-    const N = signal.length;
-    const fs = params.samplingRate;
-    const filtered = new Float32Array(N);
-
-    switch (type) {
-        case 'moving_average':
-            const M = params.windowSize;
+    // Filter Coefficients Generators (2nd-Order Butterworth)
+    // Dynamic generation based on cutoff frequency and sample rate fs
+    filter: {
+        // Moving Average Filter
+        movingAverage(signal, windowSize) {
+            const N = signal.length;
+            const output = new Float32Array(N);
+            
             for (let i = 0; i < N; i++) {
                 let sum = 0;
                 let count = 0;
-                for (let j = 0; j < M; j++) {
-                    if (i - j >= 0) {
-                        sum += signal[i - j];
+                for (let k = 0; k < windowSize; k++) {
+                    if (i - k >= 0) {
+                        sum += signal[i - k];
                         count++;
                     }
                 }
-                filtered[i] = sum / count;
+                output[i] = sum / count;
             }
-            break;
+            return output;
+        },
 
-        case 'low_pass':
-            // 1st order RC low-pass filter
-            // y[n] = alpha * y[n-1] + (1 - alpha) * x[n]
-            // alpha = exp(-2 * pi * fc / fs)
-            const alphaLP = Math.exp(-2 * Math.PI * params.cutoffFreq / fs);
-            filtered[0] = signal[0]; // Avoid starting at zero
-            for (let i = 1; i < N; i++) {
-                filtered[i] = alphaLP * filtered[i - 1] + (1 - alphaLP) * signal[i];
-            }
-            break;
-
-        case 'high_pass':
-            // 1st order CR high-pass filter
-            // y[n] = alpha * y[n-1] + alpha * (x[n] - x[n-1])
-            // alpha = exp(-2 * pi * fc / fs)
-            const alphaHP = Math.exp(-2 * Math.PI * params.cutoffFreq / fs);
-            filtered[0] = signal[0];
-            for (let i = 1; i < N; i++) {
-                filtered[i] = alphaHP * filtered[i - 1] + alphaHP * (signal[i] - signal[i - 1]);
-            }
-            break;
-
-        case 'band_pass':
-            // Cascade of LPF and HPF
-            // High-pass filter removes below lowCutoff, Low-pass filter removes above highCutoff
-            const temp = new Float32Array(N);
+        // 2nd Order Butterworth Lowpass Filter
+        // y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
+        lowPassCoefficients(fc, fs) {
+            const theta = 2 * Math.PI * fc / fs;
+            const K = Math.tan(theta / 2);
+            const D = 1.0 + Math.sqrt(2.0) * K + K * K;
             
-            // 1. Apply High-pass first (low Cutoff frequency)
-            const alphaBP_H = Math.exp(-2 * Math.PI * params.lowCutoff / fs);
-            temp[0] = signal[0];
-            for (let i = 1; i < N; i++) {
-                temp[i] = alphaBP_H * temp[i - 1] + alphaBP_H * (signal[i] - signal[i - 1]);
+            return {
+                b0: (K * K) / D,
+                b1: (2.0 * K * K) / D,
+                b2: (K * K) / D,
+                a1: (2.0 * (K * K - 1.0)) / D,
+                a2: (1.0 - Math.sqrt(2.0) * K + K * K) / D
+            };
+        },
+
+        // 2nd Order Butterworth Highpass Filter
+        highPassCoefficients(fc, fs) {
+            const theta = 2 * Math.PI * fc / fs;
+            const K = Math.tan(theta / 2);
+            const D = 1.0 + Math.sqrt(2.0) * K + K * K;
+            
+            return {
+                b0: 1.0 / D,
+                b1: -2.0 / D,
+                b2: 1.0 / D,
+                a1: (2.0 * (K * K - 1.0)) / D,
+                a2: (1.0 - Math.sqrt(2.0) * K + K * K) / D
+            };
+        },
+
+        // 2nd Order Butterworth Bandpass Filter
+        bandPassCoefficients(f1, f2, fs) {
+            const omega1 = Math.tan(Math.PI * f1 / fs);
+            const omega2 = Math.tan(Math.PI * f2 / fs);
+            const omega0Sq = omega1 * omega2;
+            const W = omega2 - omega1;
+            const D = 1.0 + W + omega0Sq;
+            
+            return {
+                b0: W / D,
+                b1: 0.0,
+                b2: -W / D,
+                a1: (2.0 * (omega0Sq - 1.0)) / D,
+                a2: (1.0 - W + omega0Sq) / D
+            };
+        },
+
+        // Apply 2nd order IIR filter coefficients to signal
+        applyIIR(signal, coef) {
+            const N = signal.length;
+            const output = new Float32Array(N);
+            
+            // Initial state variables
+            let x1 = 0, x2 = 0; // Inputs x[n-1], x[n-2]
+            let y1 = 0, y2 = 0; // Outputs y[n-1], y[n-2]
+            
+            for (let i = 0; i < N; i++) {
+                const x0 = signal[i];
+                // Difference equation
+                const y0 = coef.b0 * x0 + coef.b1 * x1 + coef.b2 * x2 - coef.a1 * y1 - coef.a2 * y2;
+                
+                // Shift states
+                x2 = x1;
+                x1 = x0;
+                y2 = y1;
+                y1 = y0;
+                
+                output[i] = y0;
+            }
+            return output;
+        }
+    },
+
+    // FFT Cooley-Tukey Radix-2 Implementation
+    fft: {
+        bitReverse(x, n) {
+            let rev = 0;
+            const logN = Math.log2(n);
+            for (let i = 0; i < logN; i++) {
+                if ((x & (1 << i)) !== 0) {
+                    rev |= 1 << (logN - 1 - i);
+                }
+            }
+            return rev;
+        },
+
+        // In-place Radix-2 Decimation-in-Time FFT
+        compute(re, im) {
+            const n = re.length;
+            
+            // Bit-reversal permutation
+            for (let i = 0; i < n; i++) {
+                const j = this.bitReverse(i, n);
+                if (i < j) {
+                    let temp = re[i]; re[i] = re[j]; re[j] = temp;
+                    temp = im[i]; im[i] = im[j]; im[j] = temp;
+                }
+            }
+            
+            // Cooley-Tukey core loop
+            for (let len = 2; len <= n; len <<= 1) {
+                const angle = -2.0 * Math.PI / len;
+                const wlen_re = Math.cos(angle);
+                const wlen_im = Math.sin(angle);
+                
+                for (let i = 0; i < n; i += len) {
+                    let w_re = 1.0;
+                    let w_im = 0.0;
+                    const halfLen = len >> 1;
+                    
+                    for (let j = 0; j < halfLen; j++) {
+                        const u_re = re[i + j];
+                        const u_im = im[i + j];
+                        const target_re = re[i + j + halfLen];
+                        const target_im = im[i + j + halfLen];
+                        
+                        // Complex multiplication: t = w * A[i + j + halfLen]
+                        const t_re = target_re * w_re - target_im * w_im;
+                        const t_im = target_re * w_im + target_im * w_re;
+                        
+                        re[i + j] = u_re + t_re;
+                        im[i + j] = u_im + t_im;
+                        re[i + j + halfLen] = u_re - t_re;
+                        im[i + j + halfLen] = u_im - t_im;
+                        
+                        // Multiply w by wlen
+                        const next_w_re = w_re * wlen_re - w_im * wlen_im;
+                        const next_w_im = w_re * wlen_im + w_im * wlen_re;
+                        w_re = next_w_re;
+                        w_im = next_w_im;
+                    }
+                }
+            }
+        },
+
+        // Get FFT Magnitude spectrum
+        getSpectrum(signal) {
+            const N = signal.length;
+            const re = new Float32Array(signal);
+            const im = new Float32Array(N); // Imaginary part initialized to 0
+            
+            this.compute(re, im);
+            
+            // Compute magnitude for first half (positive frequencies)
+            const halfN = N / 2;
+            const magnitude = new Float32Array(halfN);
+            
+            for (let i = 0; i < halfN; i++) {
+                // Magnitude normalized by N
+                const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]) / N;
+                // Double it for single-sided spectrum (except DC and Nyquist components)
+                magnitude[i] = (i === 0 || i === halfN - 1) ? mag : mag * 2.0;
+            }
+            
+            return magnitude;
+        }
+    },
+
+    // DSP Metrics Engine
+    metrics: {
+        // Signal Power = 1/N * sum(s_i^2)
+        calculatePower(signal) {
+            const N = signal.length;
+            let sumSq = 0.0;
+            for (let i = 0; i < N; i++) {
+                sumSq += signal[i] * signal[i];
+            }
+            return sumSq / N;
+        },
+
+        // Calculate actual signal power, noise power, SNR, MSE, and PSNR
+        calculateAll(original, noise, noisy, recovered, peakAmp) {
+            const N = original.length;
+            const sigPower = this.calculatePower(original);
+            const noisePower = this.calculatePower(noise);
+            
+            // SNR = 10 * log10(Ps / Pn)
+            let snr = 0.0;
+            if (noisePower > 0.0) {
+                snr = 10.0 * Math.log10(sigPower / noisePower);
+            } else {
+                snr = 99.9; // Arbitrary high limit when there's no noise
             }
 
-            // 2. Apply Low-pass next (high Cutoff frequency)
-            const alphaBP_L = Math.exp(-2 * Math.PI * params.highCutoff / fs);
-            filtered[0] = temp[0];
-            for (let i = 1; i < N; i++) {
-                filtered[i] = alphaBP_L * filtered[i - 1] + (1 - alphaBP_L) * temp[i];
+            // MSE = 1/N * sum( (original_i - recovered_i)^2 )
+            let sumMSE = 0.0;
+            for (let i = 0; i < N; i++) {
+                const diff = original[i] - recovered[i];
+                sumMSE += diff * diff;
             }
-            break;
+            const mse = sumMSE / N;
 
-        case 'none':
-        default:
-            filtered.set(signal);
-            break;
-    }
-    return filtered;
-}
-
-// --- FFT (Fast Fourier Transform) Cooley-Tukey ---
-function computeFFT(timeDomainData) {
-    const N = timeDomainData.length;
-    // Verify power of 2
-    if ((N & (N - 1)) !== 0) {
-        throw new Error("FFT size must be a power of 2 (current: " + N + ")");
-    }
-
-    // Convert input to complex numbers array
-    const X = new Array(N);
-    for (let i = 0; i < N; i++) {
-        X[i] = new Complex(timeDomainData[i], 0);
-    }
-
-    // Bit reversal ordering
-    let j = 0;
-    const bit = N >> 1;
-    for (let i = 0; i < N - 1; i++) {
-        if (i < j) {
-            let temp = X[i];
-            X[i] = X[j];
-            X[j] = temp;
-        }
-        let k = bit;
-        while (k <= j) {
-            j -= k;
-            k >>= 1;
-        }
-        j += k;
-    }
-
-    // Cooley-Tukey Radix-2 iterative DIT FFT
-    for (let len = 2; len <= N; len <<= 1) {
-        const angle = -2 * Math.PI / len;
-        const wlen = new Complex(Math.cos(angle), Math.sin(angle));
-        for (let i = 0; i < N; i += len) {
-            let w = new Complex(1, 0);
-            for (let k = 0; k < len / 2; k++) {
-                const u = X[i + k];
-                const t = X[i + k + len / 2].mul(w);
-                X[i + k] = u.add(t);
-                X[i + k + len / 2] = u.sub(t);
-                w = w.mul(wlen);
+            // PSNR = 10 * log10(Peak^2 / MSE)
+            let psnr = 0.0;
+            if (mse > 0.0) {
+                psnr = 10.0 * Math.log10((peakAmp * peakAmp) / mse);
+            } else {
+                psnr = 99.9; // Perfect recovery
             }
+
+            return {
+                signalPower: sigPower,
+                noisePower: noisePower,
+                snr: snr,
+                mse: mse,
+                psnr: psnr
+            };
+        }
+    },
+
+    // AM Modulation & Demodulation Engine
+    am: {
+        // Generate Standard AM (DSB-FC)
+        // s(t) = Ac * (1 + mu * msg(t)) * cos(2*pi*fc*t)
+        // message is assumed to be normalized between -1.0 and 1.0 (or normalized by its amplitude in the loop)
+        generateDSBFC(message, carrierAmp, carrierFreq, mu, timeArray) {
+            const N = timeArray.length;
+            const output = new Float32Array(N);
+            for (let i = 0; i < N; i++) {
+                const t = timeArray[i];
+                output[i] = carrierAmp * (1.0 + mu * message[i]) * Math.cos(2 * Math.PI * carrierFreq * t);
+            }
+            return output;
+        },
+
+        // Generate DSB-SC (Double Sideband Suppressed Carrier)
+        // s(t) = m(t) * Ac * cos(2*pi*fc*t)
+        generateDSBSC(message, carrierAmp, carrierFreq, timeArray) {
+            const N = timeArray.length;
+            const output = new Float32Array(N);
+            for (let i = 0; i < N; i++) {
+                const t = timeArray[i];
+                output[i] = message[i] * carrierAmp * Math.cos(2 * Math.PI * carrierFreq * t);
+            }
+            return output;
+        },
+
+        // Simple Diode Envelope Detector (Half-wave rectifier + RC discharge filter)
+        demodulateEnvelope(modulatedSignal, dt, cutoffFreq) {
+            const N = modulatedSignal.length;
+            const rectified = new Float32Array(N);
+            const output = new Float32Array(N);
+
+            // 1. Half Wave Rectification (diode passes positive polarity)
+            for (let i = 0; i < N; i++) {
+                rectified[i] = Math.max(0.0, modulatedSignal[i]);
+            }
+
+            // 2. RC Filter charging/discharging
+            // RC time constant: RC = 1 / (2 * pi * cutoffFreq)
+            const rc = 1.0 / (2.0 * Math.PI * cutoffFreq);
+            const dischargeFactor = Math.exp(-dt / rc);
+
+            let capVoltage = 0.0;
+            for (let i = 0; i < N; i++) {
+                if (rectified[i] > capVoltage) {
+                    capVoltage = rectified[i]; // Charge instantly
+                } else {
+                    capVoltage = capVoltage * dischargeFactor; // Discharge exponentially
+                }
+                output[i] = capVoltage;
+            }
+
+            // 3. DC Blocker: Remove DC average component to center the recovered signal at 0.0
+            let sum = 0.0;
+            for (let i = 0; i < N; i++) {
+                sum += output[i];
+            }
+            const avg = sum / N;
+            
+            const cleanOutput = new Float32Array(N);
+            for (let i = 0; i < N; i++) {
+                cleanOutput[i] = output[i] - avg;
+            }
+
+            return cleanOutput;
+        },
+
+        // Coherent Detector (Multiplication by carrier + Low Pass Filtering)
+        demodulateCoherent(modulatedSignal, carrierFreq, dt, fs, timeArray, lpfCutoff) {
+            const N = modulatedSignal.length;
+            const mixed = new Float32Array(N);
+            
+            // 1. Multiply by local synchronized carrier: 2 * cos(2 * pi * fc * t)
+            for (let i = 0; i < N; i++) {
+                const t = timeArray[i];
+                mixed[i] = modulatedSignal[i] * 2.0 * Math.cos(2 * Math.PI * carrierFreq * t);
+            }
+
+            // 2. Pass through 2nd order Butterworth Lowpass Filter
+            const coefs = DSP.filter.lowPassCoefficients(lpfCutoff, fs);
+            return DSP.filter.applyIIR(mixed, coefs);
         }
     }
+};
 
-    // Compute magnitude spectrum (normalized by N)
-    // We only return the single-sided spectrum (first N/2 elements)
-    const halfN = N / 2;
-    const magnitudes = new Float32Array(halfN);
-    for (let i = 0; i < halfN; i++) {
-        // Double the magnitude for single-sided spectrum (except DC and Nyquist components)
-        const scale = (i === 0 || i === halfN - 1) ? 1.0 / N : 2.0 / N;
-        magnitudes[i] = X[i].magnitude() * scale;
-    }
-    return magnitudes;
-}
-
-// --- Signal Metrics ---
-function calculateMetrics(original, noise, noisy, recovered) {
-    const N = original.length;
-
-    // 1. Signal Power (average squared value)
-    let signalPower = 0;
-    for (let i = 0; i < N; i++) {
-        signalPower += original[i] * original[i];
-    }
-    signalPower /= N;
-
-    // 2. Noise Power
-    let noisePower = 0;
-    for (let i = 0; i < N; i++) {
-        noisePower += noise[i] * noise[i];
-    }
-    noisePower /= N;
-
-    // 3. SNR in dB
-    // SNR = 10 * log10(Ps / Pn)
-    let snrVal = -99; // Default if division by zero or negative
-    if (noisePower > 0) {
-        snrVal = 10 * Math.log10(signalPower / noisePower);
-    } else if (signalPower > 0) {
-        snrVal = 99; // Infinite SNR (no noise)
-    }
-
-    // 4. Mean Squared Error (MSE) between recovered and original signal
-    let mse = 0;
-    for (let i = 0; i < N; i++) {
-        const error = original[i] - recovered[i];
-        mse += error * error;
-    }
-    mse /= N;
-
-    // 5. Peak Signal-to-Noise Ratio (PSNR)
-    // Find peak value of original signal (usually amplitude, but let's calculate from data)
-    let peakVal = 0.0001;
-    for (let i = 0; i < N; i++) {
-        const absVal = Math.abs(original[i]);
-        if (absVal > peakVal) peakVal = absVal;
-    }
-    
-    let psnr = -99;
-    if (mse > 0) {
-        psnr = 10 * Math.log10((peakVal * peakVal) / mse);
-    } else {
-        psnr = 99; // Perfect recovery
-    }
-
-    return {
-        signalPower: signalPower,
-        noisePower: noisePower,
-        snr: snrVal,
-        mse: mse,
-        psnr: psnr
-    };
-}
+// Export to window object for browser access
+window.DSP = DSP;
